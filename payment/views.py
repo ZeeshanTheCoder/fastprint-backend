@@ -8,6 +8,8 @@ import stripe
 import paypalrestsdk
 from .models import PaymentMethodSettings
 from .serializers import PaymentMethodSettingsSerializer
+from rest_framework.views import APIView  # <-- FIX: Import APIView
+
 
 # Import the send_simple_thank_you_email utility function
 from .utils import send_simple_thank_you_email  # Make sure this exists, or define it below
@@ -361,3 +363,21 @@ def send_thank_you_email(request):
             {'error': 'Internal server error'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+class CreatePaymentIntentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            amount = int(request.data.get('amount', 0))
+            currency = request.data.get('currency', 'usd')
+            if amount <= 0:
+                return Response({'error': 'Invalid amount'}, status=status.HTTP_400_BAD_REQUEST)
+            intent = stripe.PaymentIntent.create(
+                amount=amount,
+                currency=currency,
+                metadata={'user_id': request.user.id}
+            )
+            return Response({'clientSecret': intent.client_secret})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

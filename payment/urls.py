@@ -6,12 +6,15 @@ from .views import (
     get_paypal_payment_details,
     admin_payment_settings,
     payment_methods_status,
-    send_thank_you_email
+    send_thank_you_email,
+    CreatePaymentIntentView
 )
 
 urlpatterns = [
     # Stripe endpoint
     path('create-checkout-session/', create_checkout_session, name='create_checkout_session'),
+    path('create-payment-intent/', CreatePaymentIntentView.as_view(), name='create-payment-intent'),
+
     
     # PayPal endpoints
    path('paypal/create-payment/', create_paypal_payment, name='create_paypal_payment'),

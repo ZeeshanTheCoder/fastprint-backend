@@ -61,6 +61,60 @@ class UploadBookProjectView(APIView):
                 'errors': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
+class SaveOrderAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        data = request.data.copy()
+
+        # Validate cover presence (file or description)
+        cover_file = request.FILES.get('cover_file')
+        cover_description = data.get('cover_description')
+        if not cover_file and not cover_description:
+            return Response({
+                'status': 'error',
+                'message': 'Please provide either a cover file or a cover description.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Normalize monetary/decimal inputs to 2dp strings to satisfy Decimal fields
+        def norm_money(val):
+            try:
+                if val is None or val == "":
+                    return None
+                return f"{float(val):.2f}"
+            except Exception:
+                return None
+
+        for key in [
+            'shipping_rate', 'tax', 'product_price', 'subtotal'
+        ]:
+            if key in data:
+                data[key] = norm_money(data.get(key))
+
+        serializer = BookProjectSerializer(data=data)
+        if serializer.is_valid():
+            try:
+                project = serializer.save(user=request.user)
+                return Response({
+                    'status': 'success',
+                    'message': 'Order saved successfully.',
+                    'data': BookProjectSerializer(project).data
+                }, status=status.HTTP_201_CREATED)
+            except Exception:
+                logger.error("Error saving combined order", exc_info=True)
+                return Response({
+                    'status': 'error',
+                    'message': 'An error occurred while saving the order.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.warning("Validation error (save order): %s", serializer.errors)
+            return Response({
+                'status': 'error',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
     def send_cover_expert_email(self, request, book_project):
         """Send email notification for cover expert requests"""
         try:
@@ -98,7 +152,7 @@ class UploadBookProjectView(APIView):
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
-                ['fuqureshi@gmail.com'],  # Replace with your recipient email
+                ['zeeshanzahid663@gmail.com'],  # Replace with your recipient email
                 fail_silently=False,
             )
             
@@ -252,6 +306,27 @@ def admin_all_orders(request):
             "pdf_file": order.pdf_file.url if order.pdf_file else None,
             "cover_file": order.cover_file.url if order.cover_file else None,
             "cover_description": order.cover_description,
+            # Shipping/checkout fields
+            "first_name": order.first_name,
+            "last_name": order.last_name,
+            "company": order.company,
+            "address": order.address,
+            "apt_floor": order.apt_floor,
+            "country": order.country,
+            "state": order.state,
+            "city": order.city,
+            "postal_code": order.postal_code,
+            "phone_number": order.phone_number,
+            "account_type": order.account_type,
+            "has_resale_cert": order.has_resale_cert,
+            "shipping_rate": order.shipping_rate,
+            "tax": order.tax,
+            "courier_name": order.courier_name,
+            "estimated_delivery": order.estimated_delivery,
+            "selected_service": order.selected_service,
+            "product_quantity": order.product_quantity,
+            "product_price": order.product_price,
+            "subtotal": order.subtotal,
         })
 
     return Response({

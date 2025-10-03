@@ -50,6 +50,33 @@ class BookProject(models.Model):
 
     # ✅ New field for cover design description
     cover_description = models.TextField(blank=True, null=True)
+
+    # ===== Shipping and Checkout (saved at /shop) =====
+    # Shipping address and account details
+    first_name = models.CharField(max_length=100, blank=True, null=True)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
+    company = models.CharField(max_length=255, blank=True, null=True)
+    address = models.CharField(max_length=255, blank=True, null=True)
+    apt_floor = models.CharField(max_length=100, blank=True, null=True)
+    country = models.CharField(max_length=10, blank=True, null=True)
+    state = models.CharField(max_length=50, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = models.CharField(max_length=50, blank=True, null=True)
+    account_type = models.CharField(max_length=20, blank=True, null=True)
+    has_resale_cert = models.BooleanField(default=False)
+
+    # Shipping computation outcome
+    shipping_rate = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    tax = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    courier_name = models.CharField(max_length=100, blank=True, null=True)
+    estimated_delivery = models.CharField(max_length=100, blank=True, null=True)
+    selected_service = models.TextField(blank=True, null=True)  # JSON or text description
+
+    # Order/pricing summary
+    product_quantity = models.PositiveIntegerField(blank=True, null=True)
+    product_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     
 
     def __str__(self):
