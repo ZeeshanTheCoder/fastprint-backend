@@ -1,3 +1,4 @@
+# views.py
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -6,10 +7,8 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.mail import send_mail
 from django.conf import settings
-
 from .models import BookProject
 from .serializers import BookProjectSerializer
-
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class UploadBookProjectView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]  # To handle file uploads
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         data = request.data.copy()
@@ -25,7 +24,6 @@ class UploadBookProjectView(APIView):
         cover_description = data.get('cover_description')
         is_cover_expert = data.get('is_cover_expert', False)
 
-        # Must provide either a cover file or a cover description
         if not cover_file and not cover_description:
             return Response({
                 'status': 'error',
@@ -36,13 +34,9 @@ class UploadBookProjectView(APIView):
 
         if serializer.is_valid():
             try:
-                # Save the book project
                 book_project = serializer.save(user=request.user)
-                
-                # Send email if this is a cover expert submission
                 if is_cover_expert:
                     self.send_cover_expert_email(request, book_project)
-                
                 return Response({
                     'status': 'success',
                     'message': 'Book project uploaded successfully.',
@@ -69,16 +63,15 @@ class SaveOrderAPIView(APIView):
     def post(self, request):
         data = request.data.copy()
 
-        # Validate cover presence (file or description)
         cover_file = request.FILES.get('cover_file')
         cover_description = data.get('cover_description')
+        
         if not cover_file and not cover_description:
             return Response({
                 'status': 'error',
                 'message': 'Please provide either a cover file or a cover description.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Normalize monetary/decimal inputs to 2dp strings to satisfy Decimal fields
         def norm_money(val):
             try:
                 if val is None or val == "":
@@ -87,11 +80,12 @@ class SaveOrderAPIView(APIView):
             except Exception:
                 return None
 
-        for key in [
-            'shipping_rate', 'tax', 'product_price', 'subtotal'
-        ]:
+        for key in ['shipping_rate', 'tax', 'product_price', 'subtotal']:
             if key in data:
                 data[key] = norm_money(data.get(key))
+
+        # ✅ CRITICAL FIX: Mark as 'paid' once saved in /shop
+        data['order_status'] = 'paid'  # ← This is the ONLY change
 
         serializer = BookProjectSerializer(data=data)
         if serializer.is_valid():
@@ -116,11 +110,8 @@ class SaveOrderAPIView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
     def send_cover_expert_email(self, request, book_project):
-        """Send email notification for cover expert requests"""
         try:
             subject = 'New Cover Expert Request Submission'
-            
-            # Build email message with project details
             message = f"""
             New Cover Expert Request Received:
             
@@ -146,30 +137,21 @@ class SaveOrderAPIView(APIView):
             
             The PDF file has been uploaded to the system and is available for review.
             """
-            
-            # Send email
             send_mail(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
-                ['zeeshanzahid663@gmail.com'],  # Replace with your recipient email
+                ['zeeshanzahid663@gmail.com'],
                 fail_silently=False,
             )
-            
             logger.info("Cover expert email sent successfully")
-            
         except Exception as e:
             logger.error(f"Failed to send cover expert email: {str(e)}")
-            # Don't raise the exception to avoid affecting the main request
 
 
-# The rest of your views remain unchanged...
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_books(request):
-    """
-    Return all books uploaded by the current authenticated user.
-    """
     try:
         books = BookProject.objects.filter(user=request.user).order_by('-created_at')
         serializer = BookProjectSerializer(books, many=True)
@@ -188,10 +170,45 @@ def user_books(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def user_unpaid_projects(request):
+    try:
+        books = BookProject.objects.filter(user=request.user, order_status='draft').order_by('-created_at')
+        serializer = BookProjectSerializer(books, many=True)
+        return Response({
+            'status': 'success',
+            'results': len(serializer.data),
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error("Failed to fetch user's unpaid projects", exc_info=True)
+        return Response({
+            'status': 'error',
+            'message': 'Failed to fetch your unpaid projects.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_paid_orders(request):
+    try:
+        books = BookProject.objects.filter(user=request.user, order_status='paid').order_by('-created_at')
+        serializer = BookProjectSerializer(books, many=True)
+        return Response({
+            'status': 'success',
+            'results': len(serializer.data),
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error("Failed to fetch user's paid orders", exc_info=True)
+        return Response({
+            'status': 'error',
+            'message': 'Failed to fetch your paid orders.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def book_detail(request, pk):
-    """
-    Retrieve a single book project by ID for the authenticated user.
-    """
     try:
         book = BookProject.objects.get(pk=pk, user=request.user)
     except BookProject.DoesNotExist:
@@ -210,9 +227,6 @@ def book_detail(request, pk):
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_book(request, pk):
-    """
-    Update an existing book project by ID for the authenticated user.
-    """
     try:
         book = BookProject.objects.get(pk=pk, user=request.user)
     except BookProject.DoesNotExist:
@@ -224,7 +238,6 @@ def update_book(request, pk):
     partial = request.method == 'PATCH'
     serializer = BookProjectSerializer(book, data=request.data, partial=partial)
 
-    # Validate presence of cover_file or cover_description if both are missing in update
     cover_file = request.FILES.get('cover_file')
     cover_description = request.data.get('cover_description') or book.cover_description
 
@@ -259,9 +272,6 @@ def update_book(request, pk):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_book(request, pk):
-    """
-    Delete a book project by ID for the authenticated user.
-    """
     try:
         book = BookProject.objects.get(pk=pk, user=request.user)
         book.delete()
@@ -280,14 +290,15 @@ def delete_book(request, pk):
             'status': 'error',
             'message': 'An error occurred while deleting the project.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def admin_all_orders(request):
     if not request.user.is_staff:
         return Response({"detail": "Not authorized."}, status=403)
 
-    orders = BookProject.objects.all().order_by("-created_at")
+    orders = BookProject.objects.filter(order_status='paid').order_by("-created_at")
     data = []
     for order in orders:
         data.append({
@@ -306,7 +317,6 @@ def admin_all_orders(request):
             "pdf_file": order.pdf_file.url if order.pdf_file else None,
             "cover_file": order.cover_file.url if order.cover_file else None,
             "cover_description": order.cover_description,
-            # Shipping/checkout fields
             "first_name": order.first_name,
             "last_name": order.last_name,
             "company": order.company,

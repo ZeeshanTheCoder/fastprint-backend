@@ -78,6 +78,12 @@ class BookProject(models.Model):
     product_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     
+    order_status = models.CharField(
+        max_length=20,
+        choices=[('draft', 'Draft'), ('paid', 'Paid')],
+        default='draft',
+        help_text='Order status: draft (unpaid/incomplete) or paid (completed)'
+    )
 
     def __str__(self):
         return f"{self.title} by {self.user.email}"

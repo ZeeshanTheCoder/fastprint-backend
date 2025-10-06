@@ -8,6 +8,8 @@ from .views import (
     book_detail,
     update_book,
     delete_book,
+    user_unpaid_projects,
+    user_paid_orders,
 )
 
 urlpatterns = [
@@ -18,4 +20,6 @@ urlpatterns = [
     path('books/<int:pk>/update/', update_book, name='book-update'),   # PUT/PATCH update project
     path('<int:pk>/delete/', delete_book, name='book-delete'),
     path("all-orders/", admin_all_orders, name="admin-all-orders"),
+    path('user-unpaid-projects/', user_unpaid_projects, name='user-unpaid-projects'),
+    path('user-paid-orders/', user_paid_orders, name='user-paid-orders'),
 ]

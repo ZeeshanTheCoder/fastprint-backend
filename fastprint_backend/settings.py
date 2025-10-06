@@ -244,7 +244,3 @@ STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY')
 PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID')
 PAYPAL_CLIENT_SECRET = config('PAYPAL_CLIENT_SECRET')
 PAYPAL_MODE = "sandbox"  # or "live"
-
-# Easyship API config
-EASYSHIP_API_URL = os.environ.get('EASYSHIP_API_URL', 'https://sandbox-api.easyship.com/2024-09/rates')
-EASYSHIP_API_KEY = os.environ.get('EASYSHIP_API_KEY', '')
